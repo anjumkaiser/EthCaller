@@ -1,6 +1,6 @@
+use ethers::prelude::{abigen, Abigen};
 use ethers::providers::{Http, Provider};
 use ethers::{prelude::*, types::U256, utils};
-use ethers::{prelude::{abigen, Abigen}};
 use std::convert::TryFrom;
 
 //type Client = SignerMiddleware<Provider<Http>, Wallet<k256::ecdsa::SigningKey>>;
@@ -87,9 +87,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Transaction Receipt: {:?}", &tx);
     */
 
-    let erc20_rw_contract =
-        ethers::contract::Contract::new(contract_address, erc20_contract_abi.clone(), signer.clone());
-
+    let erc20_rw_contract = ethers::contract::Contract::new(
+        contract_address,
+        erc20_contract_abi.clone(),
+        signer.clone(),
+    );
 
     let erc20_transfer_value = U256::from(utils::parse_units(1, erc20_decimals)?);
     println!("ERC20 formatted transfer value: {:?}", erc20_transfer_value);
@@ -102,12 +104,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
 
     let erc20_transfer_tx = method_call.send().await?;
-    
+
     //let erc20_transfer_tx = erc20_rw_contract.transfer(to_address, erc20_transfer_value);
 
     println!("ERC20 Transaction Receipt: {:?}", &erc20_transfer_tx);
     */
-
 
     abigen!(
         IERC20,
@@ -127,7 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ierc20_transfer_method = ierc20_rw_contract.transfer(to_address, erc20_transfer_value);
     let ierc20_transfer_tx = ierc20_transfer_method.send().await?;
     println!("IERC20 Transaction Receipt: {:?}", &ierc20_transfer_tx);
-
 
     Ok(())
 }
