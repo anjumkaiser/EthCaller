@@ -1,6 +1,6 @@
 use ethers::providers::{Http, Provider};
 use ethers::{prelude::*, types::U256, utils};
-
+use ethers::{prelude::{abigen, Abigen}};
 use std::convert::TryFrom;
 
 //type Client = SignerMiddleware<Provider<Http>, Wallet<k256::ecdsa::SigningKey>>;
@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let erc20_contract_abi = ethers::abi::parse_abi(&erc20abi)?;
     let erc20_contract =
-        ethers::contract::Contract::new(contract_address, erc20_contract_abi, provider);
+        ethers::contract::Contract::new(contract_address, erc20_contract_abi.clone(), provider);
 
     let erc20_decimals: u32 = erc20_contract
         .method::<_, u32>("decimals", ())?
@@ -74,6 +74,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "erc20_contract_address {:?} decimals {:?} erc20_balance {:?} erc20_balance_decoded {:?}",
         contract_address, erc20_decimals, erc20_balance, erc20_balance_decoded
     );
+
+    let to_address = to_account.parse::<Address>()?;
+
+    /*
+    let tx = TransactionRequest::new()
+        .to(to_address)
+        .value(U256::from(utils::parse_ether(0.0001)?))
+        .from(from_address);
+
+    let tx = signer.send_transaction(tx, None).await?.await?;
+    println!("Transaction Receipt: {:?}", &tx);
+    */
+
+    let erc20_rw_contract =
+        ethers::contract::Contract::new(contract_address, erc20_contract_abi.clone(), signer.clone());
+
+
+    let erc20_transfer_value = U256::from(utils::parse_units(1, erc20_decimals)?);
+    println!("ERC20 formatted transfer value: {:?}", erc20_transfer_value);
+
+    /*
+
+    let method_call = erc20_rw_contract.method::<_, bool>(
+        "transfer",
+        vec![to_address.    to_string(), erc20_transfer_value.to_string()],
+    )?;
+
+    let erc20_transfer_tx = method_call.send().await?;
+    
+    //let erc20_transfer_tx = erc20_rw_contract.transfer(to_address, erc20_transfer_value);
+
+    println!("ERC20 Transaction Receipt: {:?}", &erc20_transfer_tx);
+    */
+
+
+    abigen!(
+        IERC20,
+        r#"[
+            function totalSupply() external view returns (uint256)
+            function balanceOf(address account) external view returns (uint256)
+            function transfer(address recipient, uint256 amount) external returns (bool)
+            function allowance(address owner, address spender) external view returns (uint256)
+            function approve(address spender, uint256 amount) external returns (bool)
+            function transferFrom( address sender, address recipient, uint256 amount) external returns (bool)
+            event Transfer(address indexed from, address indexed to, uint256 value)
+            event Approval(address indexed owner, address indexed spender, uint256 value)
+        ]"#,
+    );
+
+    let ierc20_rw_contract = IERC20::new(contract_address, signer.into());
+    let ierc20_transfer_method = ierc20_rw_contract.transfer(to_address, erc20_transfer_value);
+    let ierc20_transfer_tx = ierc20_transfer_method.send().await?;
+    println!("IERC20 Transaction Receipt: {:?}", &ierc20_transfer_tx);
+
 
     Ok(())
 }
