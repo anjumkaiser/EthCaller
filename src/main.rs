@@ -1,9 +1,24 @@
+use ethers::core::{abi::AbiDecode, types::Bytes};
 use ethers::prelude::{abigen, Abigen};
 use ethers::providers::{Http, Provider};
 use ethers::{prelude::*, types::U256, utils};
 use std::convert::TryFrom;
 
 //type Client = SignerMiddleware<Provider<Http>, Wallet<k256::ecdsa::SigningKey>>;
+
+abigen!(
+    IERC20,
+    r#"[
+            function totalSupply() external view returns (uint256)
+            function balanceOf(address account) external view returns (uint256)
+            function transfer(address recipient, uint256 amount) external returns (bool)
+            function allowance(address owner, address spender) external view returns (uint256)
+            function approve(address spender, uint256 amount) external returns (bool)
+            function transferFrom( address sender, address recipient, uint256 amount) external returns (bool)
+            event Transfer(address indexed from, address indexed to, uint256 value)
+            event Approval(address indexed owner, address indexed spender, uint256 value)
+        ]"#,
+);
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -55,8 +70,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //println!("code {:?}", code);
 
     let erc20_contract_abi = ethers::abi::parse_abi(&erc20abi)?;
-    let erc20_contract =
-        ethers::contract::Contract::new(contract_address, erc20_contract_abi.clone(), provider);
+    let erc20_contract = ethers::contract::Contract::new(
+        contract_address,
+        erc20_contract_abi.clone(),
+        provider.clone(),
+    );
 
     let erc20_decimals: u32 = erc20_contract
         .method::<_, u32>("decimals", ())?
@@ -110,24 +128,96 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("ERC20 Transaction Receipt: {:?}", &erc20_transfer_tx);
     */
 
-    abigen!(
-        IERC20,
-        r#"[
-            function totalSupply() external view returns (uint256)
-            function balanceOf(address account) external view returns (uint256)
-            function transfer(address recipient, uint256 amount) external returns (bool)
-            function allowance(address owner, address spender) external view returns (uint256)
-            function approve(address spender, uint256 amount) external returns (bool)
-            function transferFrom( address sender, address recipient, uint256 amount) external returns (bool)
-            event Transfer(address indexed from, address indexed to, uint256 value)
-            event Approval(address indexed owner, address indexed spender, uint256 value)
-        ]"#,
-    );
-
     let ierc20_rw_contract = IERC20::new(contract_address, signer.into());
     let ierc20_transfer_method = ierc20_rw_contract.transfer(to_address, erc20_transfer_value);
     let ierc20_transfer_tx = ierc20_transfer_method.send().await?;
     println!("IERC20 Transaction Receipt: {:?}", &ierc20_transfer_tx);
+
+    /*
+    '0xf3864301fd32e52e03904daceb80941daffffc7dce843f025e34705f4ef22a5c', // Smart contract sent from wallet
+    '0xe7a4e28e0748f7484efe5cad6414ebcc11afc67b67922dc748958fcd12d9988f', // ETH sent from wallet
+    '0xe7a4e28e0748f7484efe5cad6414ebcc11afc67b67922dc748958fcd12d9988c', // FALSE
+    '0xedcc46917ab09b5d5b0f08f359061c5339d3d6eea0f1fee059ab842b41d08366', // RECV ETH
+    '0xc3c166d417f22c21e28f8c8f3540aadabccafd64fd8d512ab91944a5b1276aa1', // Approve token spend limit
+    '0xd042ed8f01b27ee31192cd7b46c2a3f5066bd31a4addf243cffcfeb795dedd4f', // SWAP Exact ETH for TOKENS
+    '0x816df23c517b234d30e5504289ca40f66f9571b803b7a54e19bf4b724c67b299', // Approve WETH spend limit
+    */
+
+    let txnList = [
+        "0x28eac16d0873e3cd24baa261e51f4a1ae4f92d96a94ed5fcc244346d85a6a91a", // ETH 0.2 recvd into wallet
+        "0x1a99db4fd9783d9d2a8e7e359cd81745418b22210cab9abece78d4cd96f1f4dd", // NEXM 10,000,000 transfer() into wallet
+        "0x279f831252e4c32022d82bd5afef1fdd51eb1c86d8417d52cb6251b87f110e21", // ETH 0.0001 sent from wallet
+        "0x9579e0cb7a7fa16942868b9f731167463fdb9c848d83f6903bf143645b5143c5", // NEXM 1 transfer() from wallet
+        "0xe7a4e28e0748f7484efe5cad6414ebcc11afc67b67922dc748958fcd12d9988c", // FALSE TXN
+    ];
+
+    verifyTransaction(
+        &provider,
+        "0x28eac16d0873e3cd24baa261e51f4a1ae4f92d96a94ed5fcc244346d85a6a91a",
+    )
+    .await;
+
+    verifyTransaction(
+        &provider,
+        "0x1a99db4fd9783d9d2a8e7e359cd81745418b22210cab9abece78d4cd96f1f4dd",
+    )
+    .await;
+
+    verifyTransaction(
+        &provider,
+        "0x9579e0cb7a7fa16942868b9f731167463fdb9c848d83f6903bf143645b5143c5",
+    )
+    .await;
+
+    Ok(())
+}
+
+async fn verifyTransaction(
+    provider: &Provider<Http>,
+    //abi: &ethers::abi::Abi,
+    txHash: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let hash: H256 = txHash.parse::<H256>()?;
+
+    println!("running traces for txHash {}", txHash);
+    let options: GethDebugTracingOptions = GethDebugTracingOptions::default();
+    match provider.debug_trace_transaction(hash, options).await {
+        Ok(trace) => {
+            println!("trace ran");
+            println!("trace {:?}", trace);
+        }
+        Err(x) => {
+            println!("trace failedx {:?}", x);
+        }
+    };
+    println!("");
+
+    println!("fetching status for {:?}", hash);
+    let txnStatus = provider.get_transaction(hash).await?.unwrap();
+    println!("txStatus {:?}", txnStatus);
+
+    println!("txStatus {:?}", txnStatus.input);
+    if txnStatus.input.to_string() == "0x" {
+        println!("Ethereum Transfer");
+        println!("from {:?}", txnStatus.from);
+        println!("to {:?}", txnStatus.to.unwrap());
+        println!("value {:?}", ethers::utils::format_ether(txnStatus.value));
+    } else {
+        println!("Smartcontract interaction");
+        //println!("input {:?}", txnStatus.input);
+        println!("from {:?}", txnStatus.from);
+        println!(
+            "input {:?}",
+            TransferCall::decode(&txnStatus.input)?.recipient
+        );
+        println!(
+            "value {:?}",
+            ethers::utils::format_units(TransferCall::decode(&txnStatus.input)?.amount, 8)
+        );
+    }
+
+    println!("");
+    println!("");
 
     Ok(())
 }
