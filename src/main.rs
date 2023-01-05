@@ -202,6 +202,8 @@ async fn verifyTransaction(
         println!("from {:?}", txnStatus.from);
         println!("to {:?}", txnStatus.to.unwrap());
         println!("value {:?}", ethers::utils::format_ether(txnStatus.value));
+        println!("block number {}", txnStatus.block_number.unwrap());
+        println!("block hash {}", txnStatus.block_hash.unwrap());
     } else {
         println!("Smartcontract interaction");
         //println!("input {:?}", txnStatus.input);
@@ -214,7 +216,13 @@ async fn verifyTransaction(
             "value {:?}",
             ethers::utils::format_units(TransferCall::decode(&txnStatus.input)?.amount, 8)
         );
+        println!("block number {}", txnStatus.block_number.unwrap());
+        println!("block hash {}", txnStatus.block_hash.unwrap());
     }
+
+    let block_hash: H256 = txnStatus.block_hash.unwrap();
+    let block =  provider.get_block(block_hash).await;
+    println!("block {:?}", block);
 
     println!("");
     println!("");
