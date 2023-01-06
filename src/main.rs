@@ -208,13 +208,15 @@ async fn verifyTransaction(
         println!("Smartcontract interaction");
         //println!("input {:?}", txnStatus.input);
         println!("from {:?}", txnStatus.from);
+
+        let decoded_data = TransferCall::decode(&txnStatus.input)?;
         println!(
             "input {:?}",
-            TransferCall::decode(&txnStatus.input)?.recipient
+            decoded_data.recipient
         );
         println!(
             "value {:?}",
-            ethers::utils::format_units(TransferCall::decode(&txnStatus.input)?.amount, 8)
+            ethers::utils::format_units(decoded_data.amount, 8)
         );
         println!("block number {}", txnStatus.block_number.unwrap());
         println!("block hash {}", txnStatus.block_hash.unwrap());
