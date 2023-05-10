@@ -7,6 +7,6 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
-ethers = { version = "1.0.2", default-features = false, features = ["rustls", "abigen"] }
-ethers-providers = "1.0.2"
-tokio = { version = "1.23.0", features = ["full"] }
+ethers = { version = "2.0.4", default-features = false, features = ["rustls", "abigen"] }
+ethers-providers = "2.0.4"
+tokio = { version = "1.28.0", features = ["full"] }

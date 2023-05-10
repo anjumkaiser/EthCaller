@@ -3,6 +3,7 @@ use ethers::prelude::{abigen, Abigen};
 use ethers::providers::{Http, Provider};
 use ethers::{prelude::*, types::U256, utils};
 use std::convert::TryFrom;
+use std::sync::Arc;
 
 //type Client = SignerMiddleware<Provider<Http>, Wallet<k256::ecdsa::SigningKey>>;
 
@@ -35,8 +36,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "event Transfer(address indexed from, address indexed to, uint amount)",
     ];
 
-    let provider =
-        Provider::<Http>::try_from("https://goerli.infura.io/v3/af5be3175a8e43b2a5624cbce46e76b1")?;
+    let provider = Arc::new(Provider::<Http>::try_from(
+        "https://goerli.infura.io/v3/af5be3175a8e43b2a5624cbce46e76b1",
+    )?);
 
     println!("Got provider {:?}", &provider);
 
@@ -63,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let contract_address = contract_address.parse::<Address>()?;
-    let balance_contract = provider.get_balance(contract_address, None).await?;
+    let balance_contract = provider.clone().get_balance(contract_address, None).await?;
     println!("balance_contract {:?}", balance_contract);
 
     //let code = provider.get_code(contract_address, None).await?;
@@ -108,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let erc20_rw_contract = ethers::contract::Contract::new(
         contract_address,
         erc20_contract_abi.clone(),
-        signer.clone(),
+        Arc::new(signer.clone()),
     );
 
     let erc20_transfer_value = U256::from(utils::parse_units(1, erc20_decimals)?);
@@ -152,19 +154,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
 
     verifyTransaction(
-        &provider,
+        &provider.clone(),
         "0x28eac16d0873e3cd24baa261e51f4a1ae4f92d96a94ed5fcc244346d85a6a91a",
     )
     .await;
 
     verifyTransaction(
-        &provider,
+        &provider.clone(),
         "0x1a99db4fd9783d9d2a8e7e359cd81745418b22210cab9abece78d4cd96f1f4dd",
     )
     .await;
 
     verifyTransaction(
-        &provider,
+        &provider.clone(),
         "0x9579e0cb7a7fa16942868b9f731167463fdb9c848d83f6903bf143645b5143c5",
     )
     .await;
@@ -210,10 +212,7 @@ async fn verifyTransaction(
         println!("from {:?}", txnStatus.from);
 
         let decoded_data = TransferCall::decode(&txnStatus.input)?;
-        println!(
-            "input {:?}",
-            decoded_data.recipient
-        );
+        println!("input {:?}", decoded_data.recipient);
         println!(
             "value {:?}",
             ethers::utils::format_units(decoded_data.amount, 8)
@@ -223,7 +222,7 @@ async fn verifyTransaction(
     }
 
     let block_hash: H256 = txnStatus.block_hash.unwrap();
-    let block =  provider.get_block(block_hash).await;
+    let block = provider.get_block(block_hash).await;
     println!("block {:?}", block);
 
     println!("");
